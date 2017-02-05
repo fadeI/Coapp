@@ -1,156 +1,142 @@
 ﻿using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using Microsoft.Msagl.Core.Geometry.Curves;
-using Microsoft.Msagl.Core.Layout;
-using Point = Microsoft.Msagl.Core.Geometry.Point;
-using Rectangle = Microsoft.Msagl.Core.Geometry.Rectangle;
 using System.Windows.Forms;
-using System.Collections.Generic;
-using Microsoft.Msagl.Layout.Layered;
-using Microsoft.Msagl.Core.Routing;
 using Microsoft.Msagl.Drawing;
+using REDGraphData;
+using Microsoft.Msagl.GraphViewerGdi;
+using System.Text;
+using System.Drawing.Drawing2D;
 
 namespace Coapp
 {
     public partial class Form1 : Form
     {
-       // GeometryGraph _geometryGraph;
-       Graph graph = new Graph();
+        GraphData data = new GraphData();
+        Graph graph = new Graph();
+        GViewer gViewer = new GViewer();
+        readonly ToolTip toolTip1 = new ToolTip();
+        object selectedObject;
+
         public Form1()
         {
             InitializeComponent();
-            SizeChanged += Form1_SizeChanged;
-            // the magic calls for invoking doublebuffering
-            SetStyle(ControlStyles.UserPaint, true);
-            SetStyle(ControlStyles.AllPaintingInWmPaint, true);
-            SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
+            gViewer.ObjectUnderMouseCursorChanged += new EventHandler<ObjectUnderMouseCursorChangedEventArgs>
+                (gViewer_ObjectUnderMouseCursorChanged);
         }
-
-        void Form1_SizeChanged(object sender, EventArgs e)
-        {
-            Invalidate();
-        }
-
         protected override void OnPaint(PaintEventArgs e)
         {
-            //e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            //e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-            //base.OnPaint(e);
-            //if (_geometryGraph == null)
-            //{
-            //    _geometryGraph = CreateAndLayoutGraph();
-            //}
-            //DrawingUtils.DrawFromGraph(ClientRectangle, _geometryGraph, e.Graphics);
-
-
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
             base.OnPaint(e);
-            if (graph.NodeCount == 0)
+            if (graph.NodeCount ==0)
             {
-                graph = CreateAndLayoutGraph();
+                createGraph();
             }
             DrawUtil.DrawFromGraph(ClientRectangle, graph, e.Graphics);
         }
+            
 
-
-        public Graph CreateAndLayoutGraph()
+            void gViewer_ObjectUnderMouseCursorChanged(object sender,
+            ObjectUnderMouseCursorChangedEventArgs e)
         {
-
-
-
-            Microsoft.Msagl.GraphViewerGdi.GViewer viewer = new Microsoft.Msagl.GraphViewerGdi.GViewer();
-            Graph graph = new Graph();
-            Microsoft.Msagl.Drawing.Node a = new Microsoft.Msagl.Drawing.Node("ddddddd");
-
-            graph.AddNode(a);
-
-
-
-            List<string> tablenames = new List<string>
+            if (e.OldObject != null)
             {
-                "Person\nddsadasda\ndsadasdas" , "PersonDetails"
-            };
-
-            foreach (var p in tablenames)
+                selectedObject = e.OldObject.DrawingObject;
+            }
+            else
             {
-                DrawUtil.AddNodes(p, graph, 120, 200);
+                selectedObject = null;
+            }
+            selectedObject = gViewer.SelectedObject;
+            Edge edge = selectedObject as Edge;
+            if (edge != null)
+            {
+                this.gViewer.SetToolTip(toolTip1, String.Format(edge.LabelText));
             }
 
-            MessageBox.Show(graph.NodeCount.ToString());
-            viewer.Graph = graph;
-            //associate the viewer with the form
+
+            gViewer.Invalidate();
+        }
+
+
+        private void AddNodes()
+        {
+            foreach (var table in data.AddTables())
+            {
+                Node node = new Node(table.Name);
+                node.LabelText = getTableData(table);
+                graph.AddNode(node);
+
+            }
+        }
+        private void toWayoneToMany(string tableA, string tableB, string relation)
+        {
+            Edge e = (Edge)graph.AddEdge(tableA, tableB);
+            e.Attr.ArrowheadAtSource = ArrowStyle.None;
+            e.Attr.ArrowheadAtTarget = ArrowStyle.Normal;
+            e.LabelText = relation;
+
+        }
+
+        private void AddEdges()
+        {
+            foreach (var rel in data.AddVerticies())
+            {
+
+                if (rel.RelationType.Equals(RelationType.ManyToMany))
+                {
+                    Edge e = (Edge)graph.AddEdge(rel.TableA.Name, rel.RelationType.ToString(), rel.TableB.Name);
+                    e.Attr.ArrowheadAtTarget = ArrowStyle.None;
+                    e.Attr.ArrowheadAtSource = ArrowStyle.None;
+                    e.LabelText = rel.RelationType.ToString();
+                }
+                else if (rel.RelationType.Equals(RelationType.OneToMany))
+                {
+                    toWayoneToMany(rel.TableA.Name, rel.TableB.Name, rel.RelationType.ToString());
+                }
+                else if (rel.RelationType.Equals(RelationType.ManyToOne))
+                {
+                    toWayoneToMany(rel.TableB.Name, rel.TableA.Name, rel.RelationType.ToString());
+                }
+                else if (rel.RelationType.Equals(RelationType.OneToOne))
+                {
+
+                    Edge e = (Edge)graph.AddEdge(rel.TableA.Name, rel.TableB.Name);
+                    e.Attr.ArrowheadAtSource = ArrowStyle.Normal;
+                    e.Attr.ArrowheadAtTarget = ArrowStyle.Normal;
+                    e.LabelText = rel.RelationType.ToString();
+                }
+            }
+
+        }
+
+        private string getTableData(Table table)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine(table.Name);
+            foreach (var col in table.Columns)
+            {
+                sb.AppendLine(col.Name);
+            }
+            return sb.ToString();
+
+        }
+
+        private void createGraph()
+        {
+            AddNodes();
+            AddEdges();
+            gViewer.Graph = graph;
             SuspendLayout();
-            viewer.Dock = System.Windows.Forms.DockStyle.Fill;
-            Controls.Add(viewer);
+            gViewer.Dock = System.Windows.Forms.DockStyle.Fill;
+            Controls.Add(gViewer);
             ResumeLayout();
-            return graph;
-
-            //GeometryGraph graph = new GeometryGraph();
-            //double width = 120;
-            //double height = 200;
-
-            //foreach (string id in "c d e".Split(' '))
-            //{
-            //    DrawingUtils.AddNode(id, graph, width, height);
-            //}
-
-            //var settings = new SugiyamaLayoutSettings
-            //{
-            //    Transformation = PlaneTransformation.Rotation(Math.PI / 2),
-            //    EdgeRoutingSettings = { EdgeRoutingMode = EdgeRoutingMode.Spline }
-            //};
-            //var layout = new LayeredLayout(graph, settings);
-            //layout.Run();
-            //return graph;
-
 
         }
-
-
- 
-
-
-        //public static void SetGraphTransform(GeometryGraph geometryGraph, System.Drawing.Rectangle rectangle, Graphics graphics)
-        //{
-        //    RectangleF clientRectangle = rectangle;
-        //    var gr = geometryGraph.BoundingBox;
-        //    if (clientRectangle.Height > 1 && clientRectangle.Width > 1)
-        //    {
-        //        var scale = Math.Min(clientRectangle.Width * 0.9 / gr.Width, clientRectangle.Height * 0.9 / gr.Height);
-        //        var g0 = (gr.Left + gr.Right) / 2;
-        //        var g1 = (gr.Top + gr.Bottom) / 2;
-
-        //        var c0 = (clientRectangle.Left + clientRectangle.Right) / 2;
-        //        var c1 = (clientRectangle.Top + clientRectangle.Bottom) / 2;
-        //        var dx = c0 - scale * g0;
-        //        var dy = c1 - scale * g1;
-        //        /*
-        //        //instead of setting transormation for graphics it is possible to transform the geometry graph, just to test that GeometryGraph.Transform() works
-            
-        //        var planeTransformation=new PlaneTransformation(scale,0,dx, 0, scale, dy); 
-        //        geometryGraph.Transform(planeTransformation);
-        //        */
-        //        graphics.Transform = new Matrix((float)scale, 0, 0, (float)scale, (float)dx, (float)dy);
-        //    }
-        //}
-
-   
-
- 
-        
-        public void initGraph()
+        private void Form1_Load(object sender, EventArgs e)
         {
-           
-          
-        }
-        public void CustomizedNode()
-        {
-           
 
+            createGraph();
 
         }
-
     }
 }

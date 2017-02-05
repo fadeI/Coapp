@@ -13,7 +13,7 @@ namespace Coapp
 
         public  static void DrawFromGraph(System.Drawing.Rectangle clientRectangle, GeometryGraph geometryGraph, Graphics graphics)
         {
-           SetGraphTransform(geometryGraph, clientRectangle, graphics);
+          // SetGraphTransform(geometryGraph, clientRectangle, graphics);
 
             var pen = new Pen(Brushes.Black);
             DrawNodes(geometryGraph, pen, graphics);
