@@ -31,7 +31,7 @@ namespace Coapp
             {
                 createGraph();
             }
-            DrawUtil.DrawFromGraph(ClientRectangle, graph, e.Graphics);
+            DrawUtil.DrawFromGraph(graph, e.Graphics);
         }
             
 
@@ -125,11 +125,13 @@ namespace Coapp
         {
             AddNodes();
             AddEdges();
-            gViewer.Graph = graph;
+            
             SuspendLayout();
             gViewer.Dock = System.Windows.Forms.DockStyle.Fill;
             Controls.Add(gViewer);
             ResumeLayout();
+            graph.LayoutAlgorithmSettings = new Microsoft.Msagl.Layout.Layered.SugiyamaLayoutSettings();
+            gViewer.Graph = graph;
 
         }
         private void Form1_Load(object sender, EventArgs e)
